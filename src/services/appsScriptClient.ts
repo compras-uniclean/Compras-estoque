@@ -90,6 +90,12 @@ export type ListarCotacoesResponse = {
   cotacoes: Cotacao[];
 };
 
+export type FornecedorCotacaoPayload = {
+  codigo: string;
+  nome: string;
+  email: string;
+};
+
 export type CriarCotacaoPayload = {
   codigoItem: string;
   descricaoItem: string;
@@ -99,9 +105,7 @@ export type CriarCotacaoPayload = {
   quantidadeSugerida: number;
   quantidadeSolicitada: number;
   embalagem: string;
-  codigoFornecedor: string;
-  nomeFornecedor: string;
-  emailFornecedor: string;
+  fornecedores: FornecedorCotacaoPayload[];
 };
 
 export type CriarCotacaoResponse = {
@@ -185,8 +189,6 @@ export function criarCotacao(payload: CriarCotacaoPayload) {
     quantidade_sugerida: payload.quantidadeSugerida,
     quantidade_solicitada: payload.quantidadeSolicitada,
     embalagem: payload.embalagem,
-    codigo_fornecedor: payload.codigoFornecedor,
-    nome_fornecedor: payload.nomeFornecedor,
-    email_fornecedor: payload.emailFornecedor,
+    fornecedores_json: JSON.stringify(payload.fornecedores),
   });
 }
