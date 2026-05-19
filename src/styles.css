@@ -20,6 +20,11 @@ select {
   font: inherit;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 24px;
@@ -143,6 +148,15 @@ select {
   margin-bottom: 16px;
 }
 
+.success {
+  background: #e8f7ee;
+  border: 1px solid #b9e6c9;
+  color: #146c35;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
 .metric-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -164,4 +178,113 @@ select {
 .metric span {
   color: #657084;
   font-size: 12px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 32, 51, 0.48);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 20;
+}
+
+.modal {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 24px 80px rgba(23, 32, 51, 0.28);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.modal-header h2 {
+  margin: 0 0 6px;
+}
+
+.modal-header p {
+  margin: 0;
+  color: #657084;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #f1f4f8;
+  color: #172033;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+  color: #354052;
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+  border: 1px solid #ccd4e0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #172033;
+  background: #fff;
+}
+
+.form-grid input[readonly] {
+  background: #f4f6f8;
+}
+
+.form-grid small {
+  color: #657084;
+  font-weight: 500;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 16px;
+  }
+
+  .app-header,
+  .modal-header {
+    flex-direction: column;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
