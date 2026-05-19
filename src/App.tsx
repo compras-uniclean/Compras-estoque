@@ -64,7 +64,7 @@ function App() {
     item: DashboardCard;
     quantidadeSolicitada: number;
     embalagem: string;
-    fornecedor: Fornecedor;
+    fornecedores: Fornecedor[];
   }) {
     try {
       setErro(null);
@@ -79,12 +79,16 @@ function App() {
         quantidadeSugerida: payload.item.qtdAComprar,
         quantidadeSolicitada: payload.quantidadeSolicitada,
         embalagem: payload.embalagem,
-        codigoFornecedor: payload.fornecedor.codigo,
-        nomeFornecedor: payload.fornecedor.nome,
-        emailFornecedor: payload.fornecedor.email,
+        fornecedores: payload.fornecedores.map((fornecedor) => ({
+          codigo: fornecedor.codigo,
+          nome: fornecedor.nome,
+          email: fornecedor.email,
+        })),
       });
 
-      setSucesso(`Cotação ${response.idCotacao} criada. Nenhum e-mail foi enviado.`);
+      setSucesso(
+        `Cotação ${response.idCotacao} criada para ${response.fornecedoresCriados.length} fornecedor(es). Nenhum e-mail foi enviado.`,
+      );
       setCardSelecionado(null);
       setAba('cotacoes');
       await carregarDados();
@@ -234,16 +238,41 @@ function EmitirCotacaoModal({
     item: DashboardCard;
     quantidadeSolicitada: number;
     embalagem: string;
-    fornecedor: Fornecedor;
+    fornecedores: Fornecedor[];
   }) => Promise<void>;
 }) {
   const [quantidade, setQuantidade] = useState(String(item.qtdAComprar || ''));
   const [embalagem, setEmbalagem] = useState(embalagens[0] || '');
   const [fornecedorCodigo, setFornecedorCodigo] = useState('');
+  const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState<Fornecedor[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [erroModal, setErroModal] = useState<string | null>(null);
 
   const fornecedorSelecionado = fornecedores.find((fornecedor) => fornecedor.codigo === fornecedorCodigo);
+
+  function adicionarFornecedor() {
+    if (!fornecedorSelecionado) {
+      setErroModal('Selecione um fornecedor para adicionar.');
+      return;
+    }
+
+    const jaAdicionado = fornecedoresSelecionados.some(
+      (fornecedor) => fornecedor.codigo === fornecedorSelecionado.codigo,
+    );
+
+    if (jaAdicionado) {
+      setErroModal('Este fornecedor já foi adicionado à cotação.');
+      return;
+    }
+
+    setFornecedoresSelecionados((atuais) => [...atuais, fornecedorSelecionado]);
+    setFornecedorCodigo('');
+    setErroModal(null);
+  }
+
+  function removerFornecedor(codigo: string) {
+    setFornecedoresSelecionados((atuais) => atuais.filter((fornecedor) => fornecedor.codigo !== codigo));
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -260,8 +289,8 @@ function EmitirCotacaoModal({
       return;
     }
 
-    if (!fornecedorSelecionado) {
-      setErroModal('Selecione um fornecedor.');
+    if (!fornecedoresSelecionados.length) {
+      setErroModal('Adicione pelo menos um fornecedor à cotação.');
       return;
     }
 
@@ -272,7 +301,7 @@ function EmitirCotacaoModal({
         item,
         quantidadeSolicitada: quantidadeNumero,
         embalagem,
-        fornecedor: fornecedorSelecionado,
+        fornecedores: fornecedoresSelecionados,
       });
     } finally {
       setSalvando(false);
@@ -327,6 +356,29 @@ function EmitirCotacaoModal({
             E-mail
             <input value={fornecedorSelecionado?.email || ''} readOnly placeholder="Preenchido automaticamente" />
           </label>
+
+          <div className="full-width">
+            <button className="secondary-button" type="button" onClick={adicionarFornecedor}>
+              Adicionar fornecedor à cotação
+            </button>
+          </div>
+
+          <div className="full-width selected-suppliers">
+            <strong>Fornecedores adicionados</strong>
+            {fornecedoresSelecionados.length ? (
+              <div className="supplier-list">
+                {fornecedoresSelecionados.map((fornecedor) => (
+                  <div className="supplier-chip" key={fornecedor.codigo}>
+                    <span>{fornecedor.nome}</span>
+                    <small>{fornecedor.email}</small>
+                    <button type="button" onClick={() => removerFornecedor(fornecedor.codigo)}>Remover</button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>Nenhum fornecedor adicionado ainda.</p>
+            )}
+          </div>
 
           <div className="notice full-width">
             Este botão apenas cria a cotação no app. Nenhum e-mail será enviado nesta etapa.
