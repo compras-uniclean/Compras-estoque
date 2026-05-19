@@ -90,6 +90,32 @@ export type ListarCotacoesResponse = {
   cotacoes: Cotacao[];
 };
 
+export type CriarCotacaoPayload = {
+  codigoItem: string;
+  descricaoItem: string;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  estoqueMaximo: number;
+  quantidadeSugerida: number;
+  quantidadeSolicitada: number;
+  embalagem: string;
+  codigoFornecedor: string;
+  nomeFornecedor: string;
+  emailFornecedor: string;
+};
+
+export type CriarCotacaoResponse = {
+  mensagem: string;
+  idCotacao: string;
+  fornecedoresCriados: Array<{
+    idCotacaoFornecedor: string;
+    codigo: string;
+    nome: string;
+    email: string;
+    status: string;
+  }>;
+};
+
 const API_URL = import.meta.env.VITE_APPS_SCRIPT_URL as string | undefined;
 const API_TOKEN = import.meta.env.VITE_APPS_SCRIPT_TOKEN as string | undefined;
 
@@ -147,4 +173,20 @@ export function getListasBasicas() {
 
 export function listarCotacoes(limite = 30) {
   return request<ListarCotacoesResponse>('listarCotacoes', { limite });
+}
+
+export function criarCotacao(payload: CriarCotacaoPayload) {
+  return request<CriarCotacaoResponse>('criarCotacao', {
+    codigo_item: payload.codigoItem,
+    descricao_item: payload.descricaoItem,
+    estoque_atual: payload.estoqueAtual,
+    estoque_minimo: payload.estoqueMinimo,
+    estoque_maximo: payload.estoqueMaximo,
+    quantidade_sugerida: payload.quantidadeSugerida,
+    quantidade_solicitada: payload.quantidadeSolicitada,
+    embalagem: payload.embalagem,
+    codigo_fornecedor: payload.codigoFornecedor,
+    nome_fornecedor: payload.nomeFornecedor,
+    email_fornecedor: payload.emailFornecedor,
+  });
 }
