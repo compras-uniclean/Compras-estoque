@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  DashboardCard,
   Cotacao,
+  DashboardCard,
+  Fornecedor,
   getDashboardCompras,
+  getFornecedores,
   getListasBasicas,
-  listarCotacoes,
   ListasBasicas,
+  listarCotacoes,
+  criarCotacao,
 } from './services/appsScriptClient';
 
 type Aba = 'compras' | 'cotacoes' | 'recebimento';
@@ -14,9 +17,12 @@ function App() {
   const [aba, setAba] = useState<Aba>('compras');
   const [cards, setCards] = useState<DashboardCard[]>([]);
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [listas, setListas] = useState<ListasBasicas | null>(null);
+  const [cardSelecionado, setCardSelecionado] = useState<DashboardCard | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [sucesso, setSucesso] = useState<string | null>(null);
 
   const resumo = useMemo(() => {
     const totalComprar = cards.reduce((acc, item) => acc + item.qtdAComprar, 0);
@@ -27,30 +33,65 @@ function App() {
     };
   }, [cards, cotacoes]);
 
-  useEffect(() => {
-    async function carregarDados() {
-      try {
-        setCarregando(true);
-        setErro(null);
+  async function carregarDados() {
+    try {
+      setCarregando(true);
+      setErro(null);
 
-        const [dashboard, listasBasicas, cotacoesResponse] = await Promise.all([
-          getDashboardCompras(30),
-          getListasBasicas(),
-          listarCotacoes(30),
-        ]);
+      const [dashboard, listasBasicas, cotacoesResponse, fornecedoresResponse] = await Promise.all([
+        getDashboardCompras(30),
+        getListasBasicas(),
+        listarCotacoes(30),
+        getFornecedores('', 200),
+      ]);
 
-        setCards(dashboard.cards);
-        setListas(listasBasicas);
-        setCotacoes(cotacoesResponse.cotacoes);
-      } catch (error) {
-        setErro(error instanceof Error ? error.message : 'Erro ao carregar dados.');
-      } finally {
-        setCarregando(false);
-      }
+      setCards(dashboard.cards);
+      setListas(listasBasicas);
+      setCotacoes(cotacoesResponse.cotacoes);
+      setFornecedores(fornecedoresResponse.fornecedores.filter((fornecedor) => fornecedor.email));
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Erro ao carregar dados.');
+    } finally {
+      setCarregando(false);
     }
+  }
 
+  useEffect(() => {
     carregarDados();
   }, []);
+
+  async function handleCriarCotacao(payload: {
+    item: DashboardCard;
+    quantidadeSolicitada: number;
+    embalagem: string;
+    fornecedor: Fornecedor;
+  }) {
+    try {
+      setErro(null);
+      setSucesso(null);
+
+      const response = await criarCotacao({
+        codigoItem: payload.item.codigo,
+        descricaoItem: payload.item.descricao,
+        estoqueAtual: payload.item.estoqueAtual,
+        estoqueMinimo: payload.item.estoqueMinimo,
+        estoqueMaximo: payload.item.estoqueMaximo,
+        quantidadeSugerida: payload.item.qtdAComprar,
+        quantidadeSolicitada: payload.quantidadeSolicitada,
+        embalagem: payload.embalagem,
+        codigoFornecedor: payload.fornecedor.codigo,
+        nomeFornecedor: payload.fornecedor.nome,
+        emailFornecedor: payload.fornecedor.email,
+      });
+
+      setSucesso(`Cotação ${response.idCotacao} criada. Nenhum e-mail foi enviado.`);
+      setCardSelecionado(null);
+      setAba('cotacoes');
+      await carregarDados();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Erro ao criar cotação.');
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -63,6 +104,7 @@ function App() {
       </header>
 
       {erro ? <div className="error">{erro}</div> : null}
+      {sucesso ? <div className="success">{sucesso}</div> : null}
 
       <section className="card-grid" style={{ marginBottom: 20 }}>
         <div className="card">
@@ -107,14 +149,32 @@ function App() {
 
       {carregando ? <div className="notice">Carregando dados das planilhas...</div> : null}
 
-      {!carregando && aba === 'compras' ? <Compras cards={cards} embalagens={listas?.embalagens || []} /> : null}
+      {!carregando && aba === 'compras' ? (
+        <Compras cards={cards} onEmitirCotacao={setCardSelecionado} />
+      ) : null}
       {!carregando && aba === 'cotacoes' ? <Cotacoes cotacoes={cotacoes} /> : null}
       {!carregando && aba === 'recebimento' ? <Recebimento /> : null}
+
+      {cardSelecionado ? (
+        <EmitirCotacaoModal
+          item={cardSelecionado}
+          embalagens={listas?.embalagens || []}
+          fornecedores={fornecedores}
+          onClose={() => setCardSelecionado(null)}
+          onConfirm={handleCriarCotacao}
+        />
+      ) : null}
     </main>
   );
 }
 
-function Compras({ cards, embalagens }: { cards: DashboardCard[]; embalagens: string[] }) {
+function Compras({
+  cards,
+  onEmitirCotacao,
+}: {
+  cards: DashboardCard[];
+  onEmitirCotacao: (item: DashboardCard) => void;
+}) {
   if (!cards.length) {
     return <div className="notice">Nenhum item com necessidade de compra foi encontrado.</div>;
   }
@@ -148,15 +208,139 @@ function Compras({ cards, embalagens }: { cards: DashboardCard[]; embalagens: st
           </div>
 
           <div className="card-actions">
-            <button className="primary-button" type="button">Emitir cotação</button>
+            <button className="primary-button" type="button" onClick={() => onEmitirCotacao(item)}>
+              Emitir cotação
+            </button>
             <button className="secondary-button" type="button">Ver detalhes</button>
           </div>
         </article>
       ))}
-      {embalagens.length ? (
-        <div className="notice">Embalagens carregadas: {embalagens.join(', ')}</div>
-      ) : null}
     </section>
+  );
+}
+
+function EmitirCotacaoModal({
+  item,
+  embalagens,
+  fornecedores,
+  onClose,
+  onConfirm,
+}: {
+  item: DashboardCard;
+  embalagens: string[];
+  fornecedores: Fornecedor[];
+  onClose: () => void;
+  onConfirm: (payload: {
+    item: DashboardCard;
+    quantidadeSolicitada: number;
+    embalagem: string;
+    fornecedor: Fornecedor;
+  }) => Promise<void>;
+}) {
+  const [quantidade, setQuantidade] = useState(String(item.qtdAComprar || ''));
+  const [embalagem, setEmbalagem] = useState(embalagens[0] || '');
+  const [fornecedorCodigo, setFornecedorCodigo] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erroModal, setErroModal] = useState<string | null>(null);
+
+  const fornecedorSelecionado = fornecedores.find((fornecedor) => fornecedor.codigo === fornecedorCodigo);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const quantidadeNumero = Number(quantidade.replace(',', '.'));
+
+    if (!quantidadeNumero || quantidadeNumero <= 0) {
+      setErroModal('Informe uma quantidade maior que zero.');
+      return;
+    }
+
+    if (!embalagem) {
+      setErroModal('Selecione uma embalagem.');
+      return;
+    }
+
+    if (!fornecedorSelecionado) {
+      setErroModal('Selecione um fornecedor.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErroModal(null);
+      await onConfirm({
+        item,
+        quantidadeSolicitada: quantidadeNumero,
+        embalagem,
+        fornecedor: fornecedorSelecionado,
+      });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="emitir-cotacao-title">
+        <div className="modal-header">
+          <div>
+            <h2 id="emitir-cotacao-title">Emitir cotação</h2>
+            <p>{item.descricao}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar">
+            ×
+          </button>
+        </div>
+
+        {erroModal ? <div className="error">{erroModal}</div> : null}
+
+        <form className="form-grid" onSubmit={handleSubmit}>
+          <label>
+            Quantidade disponível para compra
+            <input value={quantidade} onChange={(event) => setQuantidade(event.target.value)} />
+            <small>Sugestão: {item.qtdAComprar.toLocaleString('pt-BR')}</small>
+          </label>
+
+          <label>
+            Embalagem
+            <select value={embalagem} onChange={(event) => setEmbalagem(event.target.value)}>
+              <option value="">Selecione...</option>
+              {embalagens.map((opcao) => (
+                <option key={opcao} value={opcao}>{opcao}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Fornecedor
+            <select value={fornecedorCodigo} onChange={(event) => setFornecedorCodigo(event.target.value)}>
+              <option value="">Selecione...</option>
+              {fornecedores.map((fornecedor) => (
+                <option key={fornecedor.codigo} value={fornecedor.codigo}>
+                  {fornecedor.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            E-mail
+            <input value={fornecedorSelecionado?.email || ''} readOnly placeholder="Preenchido automaticamente" />
+          </label>
+
+          <div className="notice full-width">
+            Este botão apenas cria a cotação no app. Nenhum e-mail será enviado nesta etapa.
+          </div>
+
+          <div className="modal-actions full-width">
+            <button className="secondary-button" type="button" onClick={onClose}>Cancelar</button>
+            <button className="primary-button" type="submit" disabled={salvando}>
+              {salvando ? 'Salvando...' : 'Criar cotação'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
