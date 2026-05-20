@@ -128,6 +128,33 @@ export type EnviarCotacoesResponse = {
   envioReal: boolean;
 };
 
+export type RetornoFornecedorTipo =
+  | 'aprovada'
+  | 'prazo_expirado'
+  | 'custo_acima'
+  | 'prazo_entrega_incompativel'
+  | 'validade_curta'
+  | 'outros';
+
+export type RetornarFornecedorPayload = {
+  idCotacaoFornecedor: string;
+  retorno: RetornoFornecedorTipo;
+  numeroOc?: string;
+  motivoOutros?: string;
+};
+
+export type RetornarFornecedorResponse = {
+  mensagem: string;
+  idCotacao: string;
+  idCotacaoFornecedor: string;
+  fornecedor: string;
+  email: string;
+  status: string;
+  numeroOc: string;
+  motivoReprovacao: string;
+  envioReal: boolean;
+};
+
 const API_URL = import.meta.env.VITE_APPS_SCRIPT_URL as string | undefined;
 const API_TOKEN = import.meta.env.VITE_APPS_SCRIPT_TOKEN as string | undefined;
 
@@ -204,5 +231,14 @@ export function criarCotacao(payload: CriarCotacaoPayload) {
 export function enviarCotacoes(idCotacao: string) {
   return request<EnviarCotacoesResponse>('enviarCotacoes', {
     id_cotacao: idCotacao,
+  });
+}
+
+export function retornarFornecedor(payload: RetornarFornecedorPayload) {
+  return request<RetornarFornecedorResponse>('retornarFornecedor', {
+    id_cotacao_fornecedor: payload.idCotacaoFornecedor,
+    retorno: payload.retorno,
+    numero_oc: payload.numeroOc || '',
+    motivo_outros: payload.motivoOutros || '',
   });
 }
