@@ -120,6 +120,14 @@ export type CriarCotacaoResponse = {
   }>;
 };
 
+export type EnviarCotacoesResponse = {
+  mensagem: string;
+  idCotacao: string;
+  status: string;
+  fornecedoresAtualizados: number;
+  envioReal: boolean;
+};
+
 const API_URL = import.meta.env.VITE_APPS_SCRIPT_URL as string | undefined;
 const API_TOKEN = import.meta.env.VITE_APPS_SCRIPT_TOKEN as string | undefined;
 
@@ -190,5 +198,11 @@ export function criarCotacao(payload: CriarCotacaoPayload) {
     quantidade_solicitada: payload.quantidadeSolicitada,
     embalagem: payload.embalagem,
     fornecedores_json: JSON.stringify(payload.fornecedores),
+  });
+}
+
+export function enviarCotacoes(idCotacao: string) {
+  return request<EnviarCotacoesResponse>('enviarCotacoes', {
+    id_cotacao: idCotacao,
   });
 }
