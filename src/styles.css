@@ -267,6 +267,58 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.selected-suppliers {
+  border: 1px dashed #ccd4e0;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.selected-suppliers > strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.selected-suppliers p {
+  margin: 0;
+  color: #657084;
+}
+
+.supplier-list {
+  display: grid;
+  gap: 8px;
+}
+
+.supplier-chip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e1e6ef;
+}
+
+.supplier-chip span {
+  font-weight: 700;
+}
+
+.supplier-chip small {
+  color: #657084;
+}
+
+.supplier-chip button {
+  grid-row: span 2;
+  border: none;
+  background: #fdecea;
+  color: #a51d1d;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -286,5 +338,13 @@ button:disabled {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .supplier-chip {
+    grid-template-columns: 1fr;
+  }
+
+  .supplier-chip button {
+    grid-row: auto;
   }
 }
