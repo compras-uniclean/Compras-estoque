@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Cotacao,
+  CotacaoFornecedor,
   DashboardCard,
   Fornecedor,
   getDashboardCompras,
@@ -10,9 +11,16 @@ import {
   listarCotacoes,
   criarCotacao,
   enviarCotacoes,
+  retornarFornecedor,
+  RetornoFornecedorTipo,
 } from './services/appsScriptClient';
 
 type Aba = 'compras' | 'cotacoes' | 'recebimento';
+
+type FornecedorRetornoSelecionado = {
+  cotacao: Cotacao;
+  fornecedor: CotacaoFornecedor;
+};
 
 function App() {
   const [aba, setAba] = useState<Aba>('compras');
@@ -21,6 +29,7 @@ function App() {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [listas, setListas] = useState<ListasBasicas | null>(null);
   const [cardSelecionado, setCardSelecionado] = useState<DashboardCard | null>(null);
+  const [fornecedorRetorno, setFornecedorRetorno] = useState<FornecedorRetornoSelecionado | null>(null);
   const [cotacaoEnviando, setCotacaoEnviando] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -118,6 +127,28 @@ function App() {
     }
   }
 
+  async function handleRetornarFornecedor(payload: {
+    idCotacaoFornecedor: string;
+    retorno: RetornoFornecedorTipo;
+    numeroOc?: string;
+    motivoOutros?: string;
+  }) {
+    try {
+      setErro(null);
+      setSucesso(null);
+
+      const response = await retornarFornecedor(payload);
+
+      setSucesso(
+        `${response.fornecedor} atualizado para ${response.status}. Nenhum e-mail real foi enviado.`,
+      );
+      setFornecedorRetorno(null);
+      await carregarDados();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Erro ao registrar retorno.');
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -178,7 +209,12 @@ function App() {
         <Compras cards={cards} onEmitirCotacao={setCardSelecionado} />
       ) : null}
       {!carregando && aba === 'cotacoes' ? (
-        <Cotacoes cotacoes={cotacoes} onEnviarCotacao={handleEnviarCotacao} cotacaoEnviando={cotacaoEnviando} />
+        <Cotacoes
+          cotacoes={cotacoes}
+          onEnviarCotacao={handleEnviarCotacao}
+          onResponderFornecedor={setFornecedorRetorno}
+          cotacaoEnviando={cotacaoEnviando}
+        />
       ) : null}
       {!carregando && aba === 'recebimento' ? <Recebimento /> : null}
 
@@ -189,6 +225,15 @@ function App() {
           fornecedores={fornecedores}
           onClose={() => setCardSelecionado(null)}
           onConfirm={handleCriarCotacao}
+        />
+      ) : null}
+
+      {fornecedorRetorno ? (
+        <ResponderFornecedorModal
+          cotacao={fornecedorRetorno.cotacao}
+          fornecedor={fornecedorRetorno.fornecedor}
+          onClose={() => setFornecedorRetorno(null)}
+          onConfirm={handleRetornarFornecedor}
         />
       ) : null}
     </main>
@@ -419,13 +464,122 @@ function EmitirCotacaoModal({
   );
 }
 
+function ResponderFornecedorModal({
+  cotacao,
+  fornecedor,
+  onClose,
+  onConfirm,
+}: {
+  cotacao: Cotacao;
+  fornecedor: CotacaoFornecedor;
+  onClose: () => void;
+  onConfirm: (payload: {
+    idCotacaoFornecedor: string;
+    retorno: RetornoFornecedorTipo;
+    numeroOc?: string;
+    motivoOutros?: string;
+  }) => Promise<void>;
+}) {
+  const [retorno, setRetorno] = useState<RetornoFornecedorTipo>('aprovada');
+  const [numeroOc, setNumeroOc] = useState('');
+  const [motivoOutros, setMotivoOutros] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erroModal, setErroModal] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (retorno === 'aprovada' && !numeroOc.trim()) {
+      setErroModal('Informe o número da O.C para aprovação.');
+      return;
+    }
+
+    if (retorno === 'outros' && !motivoOutros.trim()) {
+      setErroModal('Informe o motivo em Outros.');
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErroModal(null);
+      await onConfirm({
+        idCotacaoFornecedor: fornecedor.idCotacaoFornecedor,
+        retorno,
+        numeroOc,
+        motivoOutros,
+      });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="responder-fornecedor-title">
+        <div className="modal-header">
+          <div>
+            <h2 id="responder-fornecedor-title">Responder fornecedor</h2>
+            <p>{fornecedor.nomeFornecedor} · {cotacao.descricaoItem}</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar">
+            ×
+          </button>
+        </div>
+
+        {erroModal ? <div className="error">{erroModal}</div> : null}
+
+        <form className="form-grid" onSubmit={handleSubmit}>
+          <label className="full-width">
+            Retorno
+            <select value={retorno} onChange={(event) => setRetorno(event.target.value as RetornoFornecedorTipo)}>
+              <option value="aprovada">Cotação Aprovada</option>
+              <option value="prazo_expirado">Cotação Reprovada - Prazo para envio expirado</option>
+              <option value="custo_acima">Cotação Reprovada - Custo acima do negociado</option>
+              <option value="prazo_entrega_incompativel">Cotação Reprovada - Prazo de entrega incompatível</option>
+              <option value="validade_curta">Cotação Reprovada - Lote com prazo de validade curto</option>
+              <option value="outros">Cotação Reprovada - Outros motivos</option>
+            </select>
+          </label>
+
+          {retorno === 'aprovada' ? (
+            <label className="full-width">
+              Número da O.C
+              <input value={numeroOc} onChange={(event) => setNumeroOc(event.target.value)} placeholder="Ex.: OC-12345" />
+            </label>
+          ) : null}
+
+          {retorno === 'outros' ? (
+            <label className="full-width">
+              Outros motivos
+              <input value={motivoOutros} onChange={(event) => setMotivoOutros(event.target.value)} />
+            </label>
+          ) : null}
+
+          <div className="notice full-width">
+            Este botão apenas registra o retorno em modo teste. Nenhum e-mail real será enviado nesta etapa.
+          </div>
+
+          <div className="modal-actions full-width">
+            <button className="secondary-button" type="button" onClick={onClose}>Cancelar</button>
+            <button className="primary-button" type="submit" disabled={salvando}>
+              {salvando ? 'Salvando...' : 'Enviar resposta'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Cotacoes({
   cotacoes,
   onEnviarCotacao,
+  onResponderFornecedor,
   cotacaoEnviando,
 }: {
   cotacoes: Cotacao[];
   onEnviarCotacao: (idCotacao: string) => void;
+  onResponderFornecedor: (payload: FornecedorRetornoSelecionado) => void;
   cotacaoEnviando: string | null;
 }) {
   if (!cotacoes.length) {
@@ -446,6 +600,21 @@ function Cotacoes({
             <p><strong>Quantidade:</strong> {cotacao.quantidadeSolicitada.toLocaleString('pt-BR')}</p>
             <p><strong>Embalagem:</strong> {cotacao.embalagem}</p>
             <p><strong>Fornecedores:</strong> {cotacao.fornecedores.length}</p>
+
+            {cotacao.fornecedores.length ? (
+              <div className="supplier-list quotation-supplier-list">
+                {cotacao.fornecedores.map((fornecedor) => (
+                  <div className="supplier-chip" key={fornecedor.idCotacaoFornecedor}>
+                    <span>{fornecedor.nomeFornecedor}</span>
+                    <small>{fornecedor.status} · {fornecedor.email}</small>
+                    <button type="button" onClick={() => onResponderFornecedor({ cotacao, fornecedor })}>
+                      Responder
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             <div className="card-actions">
               <button
                 className="primary-button"
@@ -455,7 +624,6 @@ function Cotacoes({
               >
                 {enviandoEsta ? 'Enviando...' : podeEnviar ? 'Enviar cotação' : 'Cotação enviada'}
               </button>
-              <button className="secondary-button" type="button">Responder fornecedor</button>
             </div>
           </article>
         );
