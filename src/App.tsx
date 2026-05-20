@@ -9,6 +9,7 @@ import {
   ListasBasicas,
   listarCotacoes,
   criarCotacao,
+  enviarCotacoes,
 } from './services/appsScriptClient';
 
 type Aba = 'compras' | 'cotacoes' | 'recebimento';
@@ -20,6 +21,7 @@ function App() {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [listas, setListas] = useState<ListasBasicas | null>(null);
   const [cardSelecionado, setCardSelecionado] = useState<DashboardCard | null>(null);
+  const [cotacaoEnviando, setCotacaoEnviando] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
@@ -97,6 +99,25 @@ function App() {
     }
   }
 
+  async function handleEnviarCotacao(idCotacao: string) {
+    try {
+      setErro(null);
+      setSucesso(null);
+      setCotacaoEnviando(idCotacao);
+
+      const response = await enviarCotacoes(idCotacao);
+
+      setSucesso(
+        `${response.idCotacao} marcada como ${response.status}. Fornecedores atualizados: ${response.fornecedoresAtualizados}. Nenhum e-mail real foi enviado.`,
+      );
+      await carregarDados();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Erro ao enviar cotação.');
+    } finally {
+      setCotacaoEnviando(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -156,7 +177,9 @@ function App() {
       {!carregando && aba === 'compras' ? (
         <Compras cards={cards} onEmitirCotacao={setCardSelecionado} />
       ) : null}
-      {!carregando && aba === 'cotacoes' ? <Cotacoes cotacoes={cotacoes} /> : null}
+      {!carregando && aba === 'cotacoes' ? (
+        <Cotacoes cotacoes={cotacoes} onEnviarCotacao={handleEnviarCotacao} cotacaoEnviando={cotacaoEnviando} />
+      ) : null}
       {!carregando && aba === 'recebimento' ? <Recebimento /> : null}
 
       {cardSelecionado ? (
@@ -396,27 +419,47 @@ function EmitirCotacaoModal({
   );
 }
 
-function Cotacoes({ cotacoes }: { cotacoes: Cotacao[] }) {
+function Cotacoes({
+  cotacoes,
+  onEnviarCotacao,
+  cotacaoEnviando,
+}: {
+  cotacoes: Cotacao[];
+  onEnviarCotacao: (idCotacao: string) => void;
+  cotacaoEnviando: string | null;
+}) {
   if (!cotacoes.length) {
     return <div className="notice">Nenhuma cotação criada pelo aplicativo até agora.</div>;
   }
 
   return (
     <section className="card-grid">
-      {cotacoes.map((cotacao) => (
-        <article className="card" key={cotacao.idCotacao}>
-          <h2>{cotacao.descricaoItem}</h2>
-          <p><strong>ID:</strong> {cotacao.idCotacao}</p>
-          <p><strong>Status:</strong> {cotacao.status}</p>
-          <p><strong>Quantidade:</strong> {cotacao.quantidadeSolicitada.toLocaleString('pt-BR')}</p>
-          <p><strong>Embalagem:</strong> {cotacao.embalagem}</p>
-          <p><strong>Fornecedores:</strong> {cotacao.fornecedores.length}</p>
-          <div className="card-actions">
-            <button className="primary-button" type="button">Enviar cotação</button>
-            <button className="secondary-button" type="button">Responder fornecedor</button>
-          </div>
-        </article>
-      ))}
+      {cotacoes.map((cotacao) => {
+        const podeEnviar = cotacao.status === 'Criada';
+        const enviandoEsta = cotacaoEnviando === cotacao.idCotacao;
+
+        return (
+          <article className="card" key={cotacao.idCotacao}>
+            <h2>{cotacao.descricaoItem}</h2>
+            <p><strong>ID:</strong> {cotacao.idCotacao}</p>
+            <p><strong>Status:</strong> {cotacao.status}</p>
+            <p><strong>Quantidade:</strong> {cotacao.quantidadeSolicitada.toLocaleString('pt-BR')}</p>
+            <p><strong>Embalagem:</strong> {cotacao.embalagem}</p>
+            <p><strong>Fornecedores:</strong> {cotacao.fornecedores.length}</p>
+            <div className="card-actions">
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!podeEnviar || enviandoEsta}
+                onClick={() => onEnviarCotacao(cotacao.idCotacao)}
+              >
+                {enviandoEsta ? 'Enviando...' : podeEnviar ? 'Enviar cotação' : 'Cotação enviada'}
+              </button>
+              <button className="secondary-button" type="button">Responder fornecedor</button>
+            </div>
+          </article>
+        );
+      })}
     </section>
   );
 }
